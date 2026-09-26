@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Lua 混淆器 · 纯离线版</title>
+<title>Lua 混淆器 V7 · 纯离线版</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f1117; color: #e6e6e6; min-height: 100vh; }
@@ -35,7 +35,7 @@ a { color: #4f7cff; }
 </head>
 <body>
 <div class="wrap">
-<h1>Lua 混淆器</h1>
+<h1>Lua 混淆器 V7</h1>
 <div class="sub">纯离线单文件版 · Prometheus 引擎 · 支持 goofy_plus 等 6 档 · 全部在本地浏览器运行，脚本不会上传</div>
 
 <div class="card">
@@ -11595,7 +11595,27 @@ function applyCompatLayer(out, presetName) {
 }
 
 
-async function obfuscate(src, presetName) {
+const VERIFY_CHAIN = ['goofy_plus', 'goofy_lite', 'strong_compat', 'strong', 'medium_compat', 'strong_lite', 'weak', 'minify'];
+const MAX_ATTEMPTS_PER_PRESET = 3;
+
+function verifyLua(code) {
+  return (async () => {
+    const f = await state.loadstring(code, 'verify');
+    if (typeof f === 'string') return { ok: false, reason: 'COMPILE_ERR: ' + f.slice(0, 300) };
+    const env = state.env;
+    if (env.get('game') === undefined) env.set('game', new Proxy({}, { get: (t, k) => (k === 'GetService' ? () => new Proxy({}, { get: () => () => {} }) : {}) }), true);
+    if (env.get('workspace') === undefined) env.set('workspace', {}, true);
+    try {
+      const r = await f();
+      if (typeof r === 'string' && r.startsWith('ERR: ')) return { ok: false, reason: r.slice(0, 300) };
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, reason: 'RUN_ERR: ' + ((e && e.message) || e) };
+    }
+  })();
+}
+
+async function obfuscateOnce(src, presetName) {
   if (!state) throw new Error('引擎未就绪');
   const env = state.env;
   env.set('__INPUT', src, true);
@@ -11607,7 +11627,33 @@ return res`, 'obf');
   if (typeof wrap === 'string') throw new Error('包装编译失败: ' + wrap.slice(0, 200));
   const out = await wrap();
   const outStr = (typeof out === 'string') ? out : (out && typeof out.toString === 'function' ? out.toString() : String(out ?? ''));
+  if (outStr.startsWith('ERR: ')) throw new Error(outStr.slice(5, 305));
   return applyCompatLayer(outStr, presetName);
+}
+
+async function obfuscate(src, presetName) {
+  const startIdx = VERIFY_CHAIN.indexOf(presetName);
+  const chain = (startIdx >= 0 ? VERIFY_CHAIN.slice(startIdx) : [presetName, 'minify']);
+  const used = [];
+  for (const preset of chain) {
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS_PER_PRESET; attempt++) {
+      setStatus('混淆中…（' + PRESET_INFO[preset] + '，第 ' + attempt + ' 次尝试）', 'busy');
+      let out;
+      try {
+        out = await obfuscateOnce(src, preset);
+      } catch (e) {
+        used.push({ preset, attempt, status: ((e && e.message) || e).slice(0, 200) });
+        continue;
+      }
+      const v = await verifyLua(out);
+      if (v.ok) {
+        return { code: out, preset, fixed: preset !== presetName, note: used.length ? '已重试/降级至 ' + preset : '' };
+      }
+      used.push({ preset, attempt, status: v.reason });
+    }
+  }
+  const detail = used.slice(-3).map(u => u.preset + '#' + u.attempt + ' ' + u.status).join('\n');
+  throw new Error('全部档位与重试均未产出可运行结果。最后三次：\n' + detail);
 }
 
 $('btnObf').addEventListener('click', async () => {
@@ -11618,12 +11664,12 @@ $('btnObf').addEventListener('click', async () => {
   const t0 = performance.now();
   setStatus('混淆中…（' + PRESET_INFO[presetName] + '）', 'busy');
   try {
-    const out = await obfuscate(src, presetName);
+    const res = await obfuscate(src, presetName);
     const ms = Math.round(performance.now() - t0);
-    const ratio = (out.length / src.length * 100).toFixed(1);
-    $('output').value = out;
+    const ratio = (res.code.length / src.length * 100).toFixed(1);
+    $('output').value = res.code;
     $('btnDl').disabled = false;
-    setStatus('完成，耗时 ' + ms + ' ms；输出 ' + out.length + ' 字符，体积为输入的 ' + ratio + '%。点击「下载结果」保存。', 'ok');
+    setStatus('完成，耗时 ' + ms + ' ms；输出 ' + res.code.length + ' 字符，体积为输入的 ' + ratio + '%。' + (res.fixed ? '自动修正：' + (res.note || '已降级至 ' + res.preset) + '。' : ''), 'ok');
   } catch (e) {
     let detail = (e && e.message) || String(e);
     try { detail += '\n---\n' + JSON.stringify({ name: e && e.name, message: e && e.message, cause: e && e.cause ? (e.cause.message || String(e.cause)) : null, stack: e && e.stack ? String(e.stack).slice(0, 1200) : null }); } catch (_) {}
