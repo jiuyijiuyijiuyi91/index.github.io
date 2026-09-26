@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Lua 混淆器 V13 · 纯离线版</title>
+<title>Lua 混淆器 V14 · 纯离线版</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f1117; color: #e6e6e6; min-height: 100vh; }
@@ -35,7 +35,7 @@ a { color: #4f7cff; }
 </head>
 <body>
 <div class="wrap">
-<h1>Lua 混淆器 V13</h1>
+<h1>Lua 混淆器 V14</h1>
 <div class="sub">纯离线单文件版 · Prometheus 引擎 · 固定档位不降级 · 全部在本地浏览器运行，脚本不会上传</div>
 
 <div class="card">
@@ -11386,11 +11386,10 @@ PRESETS["minify"] = { desc = "Minify 压缩档（仅压缩体积）", config = {
   ["PrettyPrint"] = false, ["Seed"] = 0,
   ["Steps"] = {},
 } }
-PRESETS["goofy_lite"] = { desc = "Goofy Lite 瘦身双VM（双 VM + 常量数组；V13 修复大脚本崩溃，固定档位不降级）", config = {
+PRESETS["goofy_lite"] = { desc = "Goofy Lite 削弱单VM（单 VM + 常量数组，性能消耗低，Delta 更易加载）", config = {
   ["LuaVersion"] = "LuaU", ["VarNamePrefix"] = "", ["NameGenerator"] = "MangledShuffled",
   ["PrettyPrint"] = false, ["Seed"] = 0,
   ["Steps"] = {
-    { ["Name"] = "Vmify", ["Settings"] = {} },
     { ["Name"] = "Vmify", ["Settings"] = {} },
     { ["Name"] = "ConstantArray", ["Settings"] = { ["Threshold"] = 1, ["StringsOnly"] = true, ["Shuffle"] = true, ["Rotate"] = true, ["LocalWrapperThreshold"] = 0 } },
     { ["Name"] = "WrapInFunction", ["Settings"] = {} },
@@ -11479,7 +11478,7 @@ const $ = (id) => document.getElementById(id);
 const PRESET_ORDER = ['goofy_plus', 'goofy_lite', 'strong_compat', 'strong', 'medium_compat', 'strong_lite', 'weak', 'minify'];
 const PRESET_INFO = {
   goofy_plus: 'Goofy Plus 加强版（双 VM + 字符串加密 + 常量数组 + 数字变异 + 双重字符串拆分 + 变参注入）',
-  goofy_lite: 'Goofy Lite 瘦身双VM（双 VM + 常量数组；V13 修复大脚本崩溃，固定档位不降级）',
+  goofy_lite: 'Goofy Lite 削弱单VM（单 VM + 常量数组，性能消耗低，Delta 更易加载）',
   strong_compat: 'Strong 满配兼容版（双 VM + 字符串加密 + 常量数组 + 数字变异，无防篡改）',
   strong: 'Strong 官方档（含防篡改，非 Roblox 环境可能拦截业务）',
   medium_compat: 'Medium 兼容版（单 VM + 字符串加密，无防篡改）',
@@ -11520,7 +11519,7 @@ function setStatus(msg, cls) {
 const sel = $('preset');
 const PRESET_SHORT = {
   goofy_plus: 'Goofy Plus 加强版',
-  goofy_lite: 'Goofy Lite 瘦身双VM',
+  goofy_lite: 'Goofy Lite 削弱单VM',
   strong_compat: 'Strong 满配兼容版',
   strong: 'Strong 官方档',
   medium_compat: 'Medium 兼容版',
