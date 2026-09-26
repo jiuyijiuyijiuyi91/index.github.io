@@ -11387,6 +11387,26 @@ PRESETS["minify"] = { desc = "Minify 压缩档（仅压缩体积）", config = {
   ["PrettyPrint"] = false, ["Seed"] = 0,
   ["Steps"] = {},
 } }
+PRESETS["goofy_lite"] = { desc = "Goofy Lite 瘦身双VM（双 VM + 常量数组，无字符串加密/数字变异，体积对标 goofyscator）", config = {
+  ["LuaVersion"] = "LuaU", ["VarNamePrefix"] = "", ["NameGenerator"] = "MangledShuffled",
+  ["PrettyPrint"] = false, ["Seed"] = 0,
+  ["Steps"] = {
+    { ["Name"] = "Vmify", ["Settings"] = {} },
+    { ["Name"] = "Vmify", ["Settings"] = {} },
+    { ["Name"] = "ConstantArray", ["Settings"] = { ["Threshold"] = 1, ["StringsOnly"] = true, ["Shuffle"] = true, ["Rotate"] = true, ["LocalWrapperThreshold"] = 0 } },
+    { ["Name"] = "WrapInFunction", ["Settings"] = {} },
+  },
+} }
+PRESETS["strong_lite"] = { desc = "Strong Lite 瘦身单VM（单 VM + 字符串加密 + 常量数组，体积最小强档）", config = {
+  ["LuaVersion"] = "LuaU", ["VarNamePrefix"] = "", ["NameGenerator"] = "MangledShuffled",
+  ["PrettyPrint"] = false, ["Seed"] = 0,
+  ["Steps"] = {
+    { ["Name"] = "Vmify", ["Settings"] = {} },
+    { ["Name"] = "EncryptStrings", ["Settings"] = {} },
+    { ["Name"] = "ConstantArray", ["Settings"] = { ["Threshold"] = 1, ["StringsOnly"] = true, ["Shuffle"] = true, ["Rotate"] = true, ["LocalWrapperThreshold"] = 0 } },
+    { ["Name"] = "WrapInFunction", ["Settings"] = {} },
+  },
+} }
 
 local function clone(t)
   if type(t) ~= "table" then return t end
@@ -11457,12 +11477,14 @@ return "ok"
 <script type="module">
 const $ = (id) => document.getElementById(id);
 
-const PRESET_ORDER = ['goofy_plus', 'strong_compat', 'strong', 'medium_compat', 'weak', 'minify'];
+const PRESET_ORDER = ['goofy_plus', 'goofy_lite', 'strong_compat', 'strong', 'medium_compat', 'strong_lite', 'weak', 'minify'];
 const PRESET_INFO = {
   goofy_plus: 'Goofy Plus 加强版（双 VM + 字符串加密 + 常量数组 + 数字变异 + 双重字符串拆分 + 变参注入）',
+  goofy_lite: 'Goofy Lite 瘦身双VM（双 VM + 常量数组，无字符串加密/数字变异，体积对标 goofyscator）',
   strong_compat: 'Strong 满配兼容版（双 VM + 字符串加密 + 常量数组 + 数字变异，无防篡改）',
   strong: 'Strong 官方档（含防篡改，非 Roblox 环境可能拦截业务）',
   medium_compat: 'Medium 兼容版（单 VM + 字符串加密，无防篡改）',
+  strong_lite: 'Strong Lite 瘦身单VM（单 VM + 字符串加密 + 常量数组，体积最小强档）',
   weak: 'Weak 轻量档（单 VM + 基础混淆）',
   minify: 'Minify 压缩档（仅压缩体积）',
 };
@@ -11499,9 +11521,11 @@ function setStatus(msg, cls) {
 const sel = $('preset');
 const PRESET_SHORT = {
   goofy_plus: 'Goofy Plus 加强版',
+  goofy_lite: 'Goofy Lite 瘦身双VM',
   strong_compat: 'Strong 满配兼容版',
   strong: 'Strong 官方档',
   medium_compat: 'Medium 兼容版',
+  strong_lite: 'Strong Lite 瘦身单VM',
   weak: 'Weak 轻量档',
   minify: 'Minify 压缩档',
 };
