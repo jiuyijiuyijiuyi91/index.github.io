@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Lua 混淆器 V14 · 纯离线版</title>
+<title>Lua 混淆器 · 纯离线版</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f1117; color: #e6e6e6; min-height: 100vh; }
@@ -35,8 +35,8 @@ a { color: #4f7cff; }
 </head>
 <body>
 <div class="wrap">
-<h1>Lua 混淆器 V14</h1>
-<div class="sub">纯离线单文件版 · Prometheus 引擎 · 固定档位不降级 · 全部在本地浏览器运行，脚本不会上传</div>
+<h1>Lua 混淆器</h1>
+<div class="sub">纯离线单文件版 · Prometheus 引擎 · 支持 goofy_plus 等 6 档 · 全部在本地浏览器运行，脚本不会上传</div>
 
 <div class="card">
 <label for="preset">混淆档位</label>
@@ -2592,6 +2592,7 @@ return function(Compiler)
 
             local block = { id = id, index = i, block = Ast.Block(blockstats, block.scope) }
             table.insert(blocks, block);
+            blocks[id] = block;
         end
 
         table.sort(blocks, function(a, b) return a.id < b.id end);
@@ -11386,10 +11387,11 @@ PRESETS["minify"] = { desc = "Minify 压缩档（仅压缩体积）", config = {
   ["PrettyPrint"] = false, ["Seed"] = 0,
   ["Steps"] = {},
 } }
-PRESETS["goofy_lite"] = { desc = "Goofy Lite 削弱单VM（单 VM + 常量数组，性能消耗低，Delta 更易加载）", config = {
+PRESETS["goofy_lite"] = { desc = "Goofy Lite 瘦身双VM（双 VM + 常量数组，无字符串加密/数字变异，体积对标 goofyscator）", config = {
   ["LuaVersion"] = "LuaU", ["VarNamePrefix"] = "", ["NameGenerator"] = "MangledShuffled",
   ["PrettyPrint"] = false, ["Seed"] = 0,
   ["Steps"] = {
+    { ["Name"] = "Vmify", ["Settings"] = {} },
     { ["Name"] = "Vmify", ["Settings"] = {} },
     { ["Name"] = "ConstantArray", ["Settings"] = { ["Threshold"] = 1, ["StringsOnly"] = true, ["Shuffle"] = true, ["Rotate"] = true, ["LocalWrapperThreshold"] = 0 } },
     { ["Name"] = "WrapInFunction", ["Settings"] = {} },
@@ -11478,7 +11480,7 @@ const $ = (id) => document.getElementById(id);
 const PRESET_ORDER = ['goofy_plus', 'goofy_lite', 'strong_compat', 'strong', 'medium_compat', 'strong_lite', 'weak', 'minify'];
 const PRESET_INFO = {
   goofy_plus: 'Goofy Plus 加强版（双 VM + 字符串加密 + 常量数组 + 数字变异 + 双重字符串拆分 + 变参注入）',
-  goofy_lite: 'Goofy Lite 削弱单VM（单 VM + 常量数组，性能消耗低，Delta 更易加载）',
+  goofy_lite: 'Goofy Lite 瘦身双VM（双 VM + 常量数组，无字符串加密/数字变异，体积对标 goofyscator）',
   strong_compat: 'Strong 满配兼容版（双 VM + 字符串加密 + 常量数组 + 数字变异，无防篡改）',
   strong: 'Strong 官方档（含防篡改，非 Roblox 环境可能拦截业务）',
   medium_compat: 'Medium 兼容版（单 VM + 字符串加密，无防篡改）',
@@ -11519,7 +11521,7 @@ function setStatus(msg, cls) {
 const sel = $('preset');
 const PRESET_SHORT = {
   goofy_plus: 'Goofy Plus 加强版',
-  goofy_lite: 'Goofy Lite 削弱单VM',
+  goofy_lite: 'Goofy Lite 瘦身双VM',
   strong_compat: 'Strong 满配兼容版',
   strong: 'Strong 官方档',
   medium_compat: 'Medium 兼容版',
@@ -11582,42 +11584,36 @@ async function initEngine() {
 
 
 function applyCompatLayer(out, presetName) {
-  // 仿 goofyscator V10 (Ge-Hub.lua) 手法：_EP_ 代理环境兼容层 + 十六进制字面量归一化
+  // 仿 AI 修复版 XJW加载器.lua 的手法：注入 _EP_ 代理环境兼容层
   // 仅对含 VM 参数引用的档位处理
   if (presetName === 'minify') return out;
-  // 明文兼容层（不转义、不隐藏），仿 goofyscator V10 (Ge-Hub.lua) 手法：_EP_ 代理环境兼容层
-  const PREFIX = `local _G0=_ENV or _G;local _E_=(_G0.getfenv and _G0.getfenv())or _G0;local _EP_=setmetatable({},{__index=_E_});_EP_.getfenv=function()return _EP_ end;if _EP_.newproxy==nil then _EP_.newproxy=function(_a)if _a then return setmetatable({}, {})end return{}end end;local _RS_=_E_ and _E_.string;if _RS_ then local _up_=(_E_.table and _E_.table.unpack)or _E_.unpack;if _up_ then _EP_.string=setmetatable({},{__index=function(_,_k)if _k=='char' then return function(...)local t={...}local n=select('#',...)for i=1,n do local v=t[i]if type(v)=='number'then v=v%256 t[i]=v-v%1 end end return _RS_.char(_up_(t,1,n))end end return _RS_[_k]end})end end;`;
+  const PREFIX = `-- compat layer (goofyscator-style, ported from AI-fixed XJW loader)
+local _E_=getfenv and getfenv() or _ENV or _G;
+local _EP_=setmetatable({},{__index=_E_});
+_EP_.getfenv=function() return _EP_ end;
+if _EP_.newproxy==nil then _EP_.newproxy=function(_a) if _a then return setmetatable({}, {}) end return {} end end;
+local _RS_=_E_.string;
+if _RS_ then
+  local _u_=(_E_.table and _E_.table.unpack) or _E_.unpack;
+  if _u_ then
+    _EP_.string=setmetatable({},{__index=function(_,_k)
+      if _k=='char' then return function(...)
+        local t={...} local n=select('#',...)
+        for i=1,n do local v=t[i] if type(v)=='number' then v=v%256 t[i]=v-v%1 end end
+        return _RS_.char(_u_(t,1,n))
+      end end
+      return _RS_[_k] end})
+  end
+end;
+`;
   let r = out.replace('getfenv and getfenv()or _ENV', '_EP_');
   r = r.replace(/([,(])newproxy([,)])/g, '$1_EP_.newproxy$2');
   r = r.replace('unpack or table[', '_EP_.unpack or table[');
-  // goofyscator V10 产物代码级十六进制一律小写 0x；归一化大写 0X 以兼容 Lua 5.1 系解析器
-  r = r.replace(/\b0[X][0-9A-Fa-f]+\b/g, function(m) { return '0x' + m.slice(2); });
-  // V11：产物第一串铭文（英文水印/标识）中文化，第二串（兼容层）保持不变
-  const WM_CN = "-- 免费脚本你都要源码我太伤心了";
-  const WM_EN = [
-    "This Script is Part of the Prometheus Obfuscator by levno-710",
-    "This file is protected by goofyscator V10 BETA-3-unstable >> goofyscator.lua.cz <<",
-    "This file is protected by goofyscator V10 BETA-2.1 >> goofyscator.lua.cz <<",
-    "This file is protected by goofyscator",
-    "This Script is Part of",
-  ];
-  for (const w of WM_EN) r = r.split(w).join(WM_CN);
-  r = r.replace(/--[^\n]*This (file is protected by|Script is Part of)[^\n]*/g, WM_CN);
-  return WM_CN + "\n" + PREFIX + r;
+  return PREFIX + r;
 }
 
 
-const MAX_ATTEMPTS = 3;
-
-function verifyLua(code) {
-  return (async () => {
-    const f = await state.loadstring(code, 'verify');
-    if (typeof f === 'string') return { ok: false, reason: 'COMPILE_ERR: ' + f.slice(0, 300) };
-    return { ok: true };
-  })();
-}
-
-async function obfuscateOnce(src, presetName) {
+async function obfuscate(src, presetName) {
   if (!state) throw new Error('引擎未就绪');
   const env = state.env;
   env.set('__INPUT', src, true);
@@ -11629,65 +11625,29 @@ return res`, 'obf');
   if (typeof wrap === 'string') throw new Error('包装编译失败: ' + wrap.slice(0, 200));
   const out = await wrap();
   const outStr = (typeof out === 'string') ? out : (out && typeof out.toString === 'function' ? out.toString() : String(out ?? ''));
-  if (outStr.startsWith('ERR: ')) throw new Error(outStr.slice(5, 305));
   return applyCompatLayer(outStr, presetName);
-}
-
-async function obfuscate(src, presetName) {
-  const used = [];
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-    setStatus('混淆中…（' + PRESET_INFO[presetName] + '，第 ' + attempt + ' 次尝试）', 'busy');
-    let out;
-    try {
-      out = await obfuscateOnce(src, presetName);
-    } catch (e) {
-      used.push({ attempt, status: ((e && e.message) || e).slice(0, 200) });
-      continue;
-    }
-    const v = await verifyLua(out);
-    if (v.ok) {
-      return { code: out, preset: presetName, note: used.length ? '重试 ' + used.length + ' 次后成功' : '' };
-    }
-    used.push({ attempt, status: v.reason });
-  }
-  const detail = used.slice(-3).map(u => '第' + u.attempt + '次 ' + u.status).join('\n');
-  throw new Error('档位 ' + presetName + ' 多次重试均未产出可运行结果。最后三次：\n' + detail);
-}
-
-
-let lastOkPreset = null;
-let lastOkSrc = '';
-let running = false;
-
-async function runObfuscate(src, presetName) {
-  const t0 = performance.now();
-  setStatus('混淆中…（' + PRESET_INFO[presetName] + '）', 'busy');
-  const res = await obfuscate(src, presetName);
-  const ms = Math.round(performance.now() - t0);
-  const ratio = (res.code.length / src.length * 100).toFixed(1);
-  $('output').value = res.code;
-  $('btnDl').disabled = false;
-  lastOkPreset = res.preset;
-  lastOkSrc = src;
-  setStatus('完成，耗时 ' + ms + ' ms；输出 ' + res.code.length + ' 字符，体积为输入的 ' + ratio + '%。' + (res.note ? '（' + res.note + '）' : '') + ' 固定使用 ' + PRESET_INFO[res.preset] + '，不自动换档。', 'ok');
 }
 
 $('btnObf').addEventListener('click', async () => {
   const src = $('input').value;
   if (!src.trim()) { setStatus('请先输入 Lua 脚本。', 'err'); return; }
   const presetName = sel.value;
-  if (running) return;
-  running = true;
   $('btnObf').disabled = true;
+  const t0 = performance.now();
+  setStatus('混淆中…（' + PRESET_INFO[presetName] + '）', 'busy');
   try {
-    await runObfuscate(src, presetName);
+    const out = await obfuscate(src, presetName);
+    const ms = Math.round(performance.now() - t0);
+    const ratio = (out.length / src.length * 100).toFixed(1);
+    $('output').value = out;
+    $('btnDl').disabled = false;
+    setStatus('完成，耗时 ' + ms + ' ms；输出 ' + out.length + ' 字符，体积为输入的 ' + ratio + '%。点击「下载结果」保存。', 'ok');
   } catch (e) {
     let detail = (e && e.message) || String(e);
     try { detail += '\n---\n' + JSON.stringify({ name: e && e.name, message: e && e.message, cause: e && e.cause ? (e.cause.message || String(e.cause)) : null, stack: e && e.stack ? String(e.stack).slice(0, 1200) : null }); } catch (_) {}
     setStatus('混淆失败: ' + detail, 'err');
     console.error(e);
   } finally {
-    running = false;
     $('btnObf').disabled = false;
   }
 });
@@ -11714,7 +11674,7 @@ $('fileInput').addEventListener('change', (e) => {
 });
 
 $('btnSample').addEventListener('click', () => { $('input').value = SAMPLE; setStatus('已填入示例脚本。', ''); });
-$('btnClear').addEventListener('click', () => { $('input').value = ''; $('output').value = ''; $('btnDl').disabled = true; lastOkPreset = null; lastOkSrc = ''; setStatus('已清空。', ''); });
+$('btnClear').addEventListener('click', () => { $('input').value = ''; $('output').value = ''; $('btnDl').disabled = true; setStatus('已清空。', ''); });
 
 initEngine();
 </script>
