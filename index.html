@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Lua 混淆器 V8 · 纯离线版</title>
+<title>Lua 混淆器 V11 · 纯离线版</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f1117; color: #e6e6e6; min-height: 100vh; }
@@ -11587,13 +11587,25 @@ function applyCompatLayer(out, presetName) {
   // 仿 goofyscator V10 (Ge-Hub.lua) 手法：_EP_ 代理环境兼容层 + 十六进制字面量归一化
   // 仅对含 VM 参数引用的档位处理
   if (presetName === 'minify') return out;
-  const PREFIX = `local _G0=_ENV or _G;local _g="\\103\\101\\116\\102\\101\\110\\118";local _n="\\110\\101\\119\\112\\114\\111\\120\\121";local _s="\\115\\116\\114\\105\\110\\103";local _h="\\99\\104\\97\\114";local _u="\\117\\110\\112\\97\\99\\107";local _E_=(_G0[_g]and _G0[_g]())or _G0;local _EP_=setmetatable({},{__index=_E_});_EP_[_g]=function()return _EP_ end;if _EP_[_n]==nil then _EP_[_n]=function(_a)if _a then return setmetatable({}, {})end return{}end end;local _RS_=_E_[_s];if _RS_ then local _up_=(_E_.table and _E_.table[_u])or _E_[_u];if _up_ then _EP_[_s]=setmetatable({},{__index=function(_,_k)if _k==_h then return function(...)local t={...}local n=select('#',...)for i=1,n do local v=t[i]if type(v)=='number'then v=v%256 t[i]=v-v%1 end end return _RS_[_h](_up_(t,1,n))end end return _RS_[_k]end})end end;`;
+  // 明文兼容层（不转义、不隐藏），仿 goofyscator V10 (Ge-Hub.lua) 手法：_EP_ 代理环境兼容层
+  const PREFIX = `local _G0=_ENV or _G;local _E_=(_G0.getfenv and _G0.getfenv())or _G0;local _EP_=setmetatable({},{__index=_E_});_EP_.getfenv=function()return _EP_ end;if _EP_.newproxy==nil then _EP_.newproxy=function(_a)if _a then return setmetatable({}, {})end return{}end end;local _RS_=_E_ and _E_.string;if _RS_ then local _up_=(_E_.table and _E_.table.unpack)or _E_.unpack;if _up_ then _EP_.string=setmetatable({},{__index=function(_,_k)if _k=='char' then return function(...)local t={...}local n=select('#',...)for i=1,n do local v=t[i]if type(v)=='number'then v=v%256 t[i]=v-v%1 end end return _RS_.char(_up_(t,1,n))end end return _RS_[_k]end})end end;`;
   let r = out.replace('getfenv and getfenv()or _ENV', '_EP_');
   r = r.replace(/([,(])newproxy([,)])/g, '$1_EP_.newproxy$2');
   r = r.replace('unpack or table[', '_EP_.unpack or table[');
   // goofyscator V10 产物代码级十六进制一律小写 0x；归一化大写 0X 以兼容 Lua 5.1 系解析器
   r = r.replace(/\b0[X][0-9A-Fa-f]+\b/g, function(m) { return '0x' + m.slice(2); });
-  return PREFIX + r;
+  // V11：产物第一串铭文（英文水印/标识）中文化，第二串（兼容层）保持不变
+  const WM_CN = "-- 免费脚本你都要源码我太伤心了";
+  const WM_EN = [
+    "This Script is Part of the Prometheus Obfuscator by levno-710",
+    "This file is protected by goofyscator V10 BETA-3-unstable >> goofyscator.lua.cz <<",
+    "This file is protected by goofyscator V10 BETA-2.1 >> goofyscator.lua.cz <<",
+    "This file is protected by goofyscator",
+    "This Script is Part of",
+  ];
+  for (const w of WM_EN) r = r.split(w).join(WM_CN);
+  r = r.replace(/--[^\n]*This (file is protected by|Script is Part of)[^\n]*/g, WM_CN);
+  return WM_CN + "\n" + PREFIX + r;
 }
 
 
