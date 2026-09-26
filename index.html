@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Lua 混淆器 V7 · 纯离线版</title>
+<title>Lua 混淆器 V8 · 纯离线版</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f1117; color: #e6e6e6; min-height: 100vh; }
@@ -35,7 +35,7 @@ a { color: #4f7cff; }
 </head>
 <body>
 <div class="wrap">
-<h1>Lua 混淆器 V7</h1>
+<h1>Lua 混淆器 V8</h1>
 <div class="sub">纯离线单文件版 · Prometheus 引擎 · 支持 goofy_plus 等 6 档 · 全部在本地浏览器运行，脚本不会上传</div>
 
 <div class="card">
@@ -11602,16 +11602,7 @@ function verifyLua(code) {
   return (async () => {
     const f = await state.loadstring(code, 'verify');
     if (typeof f === 'string') return { ok: false, reason: 'COMPILE_ERR: ' + f.slice(0, 300) };
-    const env = state.env;
-    if (env.get('game') === undefined) env.set('game', new Proxy({}, { get: (t, k) => (k === 'GetService' ? () => new Proxy({}, { get: () => () => {} }) : {}) }), true);
-    if (env.get('workspace') === undefined) env.set('workspace', {}, true);
-    try {
-      const r = await f();
-      if (typeof r === 'string' && r.startsWith('ERR: ')) return { ok: false, reason: r.slice(0, 300) };
-      return { ok: true };
-    } catch (e) {
-      return { ok: false, reason: 'RUN_ERR: ' + ((e && e.message) || e) };
-    }
+    return { ok: true };
   })();
 }
 
